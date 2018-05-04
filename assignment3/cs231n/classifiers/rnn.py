@@ -137,7 +137,27 @@ class CaptioningRNN(object):
         # defined above to store loss and gradients; grads[k] should give the      #
         # gradients for self.params[k].                                            #
         ############################################################################
-        pass
+        step1, cache1 = affine_forward(features, W_proj, b_proj)
+        step2, cache2 = word_embedding_forward(captions_in, W_embed)
+        
+        if self.cell_type == 'rnn':
+            step3, cache3 = rnn_forward(step2, step1, Wx, Wh, b)
+        else:
+            pass
+        
+        step4, cache4 = temporal_affine_forward(step3, W_vocab, b_vocab)
+        loss, dL = temporal_softmax_loss(step4, captions_out, mask)
+        
+        dL, grads['W_vocab'],  grads['b_vocab'] = temporal_affine_backward(dL, cache4)
+        
+        if self.cell_type == 'rnn':
+            dL, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dL, cache3)
+        else:
+            pass
+        
+        grads['W_embed'] = word_embedding_backward(dL, cache2)
+        dh0, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache1)
+        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -199,7 +219,15 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        pass
+        h, _ = affine_forward(features, W_proj, b_proj)
+        word_embed, _ = word_embedding_forward(self._start, W_embed)
+                
+        for t in range(0, max_length):
+            h, _ = rnn_step_forward(word_embed, h, Wx, Wh, b)
+            scores, _ = affine_forward(h, W_vocab, b_vocab)            
+            captions[:, t] = scores.argmax(axis=1)
+            word_embed, _ = word_embedding_forward(captions[:, t], W_embed)
+            
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
